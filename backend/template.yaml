@@ -1,4 +1,4 @@
-﻿AWSTemplateFormatVersion: "2010-09-09"
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: Adhikar AI - post-rejection diagnostic and repair agent
 
@@ -22,7 +22,6 @@ Globals:
 
 Resources:
 
-  # S3
   DocumentsBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -43,7 +42,6 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
 
-  # DynamoDB
   CasesTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -58,13 +56,11 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
-  # SNS
   NotificationTopic:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: adhikar-notifications
 
-  # Lambdas
   HelloFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -169,31 +165,6 @@ Resources:
                 - dynamodb:UpdateItem
               Resource: !GetAtt CasesTable.Arn
 
-
-  AnalyzeFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: adhikar-analyze
-      CodeUri: src/analyze/
-      Handler: handler.lambda_handler
-      Description: Start Step Functions analysis workflow
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - Statement:
-            - Effect: Allow
-              Action:
-                - states:StartExecution
-              Resource: !Ref AdhikarWorkflow
-            - Effect: Allow
-              Action:
-                - dynamodb:PutItem
-              Resource: !GetAtt CasesTable.Arn
-      Events:
-        Analyze:
-          Type: Api
-          Properties:
-            Path: /analyze
-            Method: post
   TrackFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -227,7 +198,31 @@ Resources:
             Path: /status/{caseId}
             Method: put
 
-  # Step Functions
+  AnalyzeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: adhikar-analyze
+      CodeUri: src/analyze/
+      Handler: handler.lambda_handler
+      Description: Start Step Functions analysis workflow
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - states:StartExecution
+              Resource: !Ref AdhikarWorkflow
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt CasesTable.Arn
+      Events:
+        Analyze:
+          Type: Api
+          Properties:
+            Path: /analyze
+            Method: post
+
   StepFunctionsRole:
     Type: AWS::IAM::Role
     Properties:
@@ -264,7 +259,6 @@ Resources:
         TrackFunctionArn: !GetAtt TrackFunction.Arn
       Role: !GetAtt StepFunctionsRole.Arn
 
-  # EventBridge
   ReminderRole:
     Type: AWS::IAM::Role
     Properties:
@@ -319,5 +313,3 @@ Outputs:
   StateMachineArn:
     Description: Step Functions ARN
     Value: !Ref AdhikarWorkflow
-
-

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Step 4 - Fuzzy Matching Lambda
 Called by Step Functions with the extract result.
 Compares simulated documents (Aadhaar vs land record vs bank) and

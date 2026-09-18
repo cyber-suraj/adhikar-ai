@@ -1,4 +1,4 @@
-﻿"""
+"""
 Analyze Lambda - HTTP entry point that starts the Step Functions workflow
 POST /analyze  { caseId, s3Key, lang?, scheme? }
      -> starts execution, returns { executionArn, caseId }

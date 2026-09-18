@@ -1,4 +1,4 @@
-﻿"""
+"""
 Step 3 - Textract Extraction Lambda
 Called by Step Functions with { caseId, s3Key }
 Extracts: scheme name, rejection reason, department, applicant name

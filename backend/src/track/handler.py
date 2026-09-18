@@ -1,4 +1,4 @@
-﻿"""
+"""
 Step 6 - Status Tracking Lambda
 GET  /status/{caseId}       -> full case record
 PUT  /status/{caseId}       -> { status, notes? }  update status

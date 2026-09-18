@@ -1,4 +1,4 @@
-﻿"""
+"""
 Step 2 - Presigned URL Lambda
 POST /presign  -> { uploadUrl, key, caseId }
 """

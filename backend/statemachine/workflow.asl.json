@@ -1,4 +1,4 @@
-﻿{
+{
   "Comment": "Adhikar AI - rejection diagnosis and repair workflow",
   "StartAt": "Extract",
   "States": {

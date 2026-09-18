@@ -1,4 +1,4 @@
-﻿"""
+"""
 Step 5 - Bedrock Generation Lambda
 Generates:
   1. Plain-language diagnosis in Hindi / Marathi / English
