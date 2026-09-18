@@ -1,0 +1,26 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+.env
+.venv/
+*.egg-info/
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+*.zip
+
+# Node
+node_modules/
+.next/
+.env.local
+.env.*.local
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/

@@ -1,0 +1,10 @@
+﻿{
+  "docType": "aadhaar",
+  "name": "Suraj Khanase",
+  "dob": "12/05/1998",
+  "fatherName": "Ramesh Khanase",
+  "address": "Flat 4B, Shivaji Nagar, Pune, Maharashtra - 411005",
+  "aadhaarNumber": "XXXX-XXXX-1234",
+  "gender": "M",
+  "note": "Simulated Aadhaar — for demo purposes only. Not real."
+}

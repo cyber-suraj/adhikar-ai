@@ -1,0 +1,118 @@
+﻿{
+  "Comment": "Adhikar AI - rejection diagnosis and repair workflow",
+  "StartAt": "Extract",
+  "States": {
+    "Extract": {
+      "Type": "Task",
+      "Resource": "${ExtractFunctionArn}",
+      "ResultPath": "$.extractResult",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "ExtractionFailed",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "Match"
+    },
+    "Match": {
+      "Type": "Task",
+      "Resource": "${MatchFunctionArn}",
+      "ResultPath": "$.matchResult",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "MatchFailed",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "HasMismatches"
+    },
+    "HasMismatches": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.matchResult.mismatchCount",
+          "NumericGreaterThan": 0,
+          "Next": "Generate"
+        }
+      ],
+      "Default": "NoMismatchFound"
+    },
+    "Generate": {
+      "Type": "Task",
+      "Resource": "${GenerateFunctionArn}",
+      "ResultPath": "$.generateResult",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "GenerateFallback",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "UpdateStatus"
+    },
+    "GenerateFallback": {
+      "Type": "Task",
+      "Resource": "${GenerateFunctionArn}",
+      "Parameters": {
+        "caseId.$": "$.caseId",
+        "useFallback": true,
+        "matchResult.$": "$.matchResult"
+      },
+      "ResultPath": "$.generateResult",
+      "Next": "UpdateStatus"
+    },
+    "UpdateStatus": {
+      "Type": "Task",
+      "Resource": "${TrackFunctionArn}",
+      "Parameters": {
+        "caseId.$": "$.caseId",
+        "status": "Diagnosed",
+        "action": "update"
+      },
+      "ResultPath": "$.trackResult",
+      "Next": "Diagnosed"
+    },
+    "Diagnosed": {
+      "Type": "Succeed"
+    },
+    "NoMismatchFound": {
+      "Type": "Succeed"
+    },
+    "ExtractionFailed": {
+      "Type": "Fail",
+      "Error": "ExtractionFailed",
+      "Cause": "Textract extraction failed after retries"
+    },
+    "MatchFailed": {
+      "Type": "Fail",
+      "Error": "MatchFailed",
+      "Cause": "Mismatch detection failed"
+    }
+  }
+}

@@ -1,0 +1,323 @@
+﻿AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Adhikar AI - post-rejection diagnostic and repair agent
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 60
+    MemorySize: 256
+    Environment:
+      Variables:
+        LOG_LEVEL: INFO
+        BUCKET_NAME: !Ref DocumentsBucket
+        TABLE_NAME: !Ref CasesTable
+        STATE_MACHINE_ARN: !Ref AdhikarWorkflow
+        SNS_TOPIC_ARN: !Ref NotificationTopic
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,PUT,OPTIONS'"
+      AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+      AllowOrigin: "'*'"
+
+Resources:
+
+  # S3
+  DocumentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "adhikar-documents-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [GET, PUT, POST]
+            AllowedOrigins: ["*"]
+            MaxAge: 3000
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # DynamoDB
+  CasesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: adhikar-cases
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: caseId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: caseId
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  # SNS
+  NotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: adhikar-notifications
+
+  # Lambdas
+  HelloFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: adhikar-hello
+      CodeUri: src/hello/
+      Handler: handler.lambda_handler
+      Description: Health check endpoint
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Events:
+        HealthCheck:
+          Type: Api
+          Properties:
+            Path: /health
+            Method: get
+
+  PresignFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: adhikar-presign
+      CodeUri: src/presign/
+      Handler: handler.lambda_handler
+      Description: Generate S3 presigned upload URL
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+              Resource: !Sub "arn:aws:s3:::adhikar-documents-${AWS::AccountId}/*"
+      Events:
+        Presign:
+          Type: Api
+          Properties:
+            Path: /presign
+            Method: post
+
+  ExtractFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: adhikar-extract
+      CodeUri: src/extract/
+      Handler: handler.lambda_handler
+      Description: Textract OCR extraction
+      Timeout: 120
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - textract:DetectDocumentText
+                - textract:AnalyzeDocument
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub "arn:aws:s3:::adhikar-documents-${AWS::AccountId}/*"
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt CasesTable.Arn
+
+  MatchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: adhikar-match
+      CodeUri: src/match/
+      Handler: handler.lambda_handler
+      Description: Fuzzy mismatch detection
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt CasesTable.Arn
+
+  GenerateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: adhikar-generate
+      CodeUri: src/generate/
+      Handler: handler.lambda_handler
+      Description: Bedrock diagnosis and correction form generation
+      Timeout: 120
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0"
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt CasesTable.Arn
+
+
+  AnalyzeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: adhikar-analyze
+      CodeUri: src/analyze/
+      Handler: handler.lambda_handler
+      Description: Start Step Functions analysis workflow
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - states:StartExecution
+              Resource: !Ref AdhikarWorkflow
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt CasesTable.Arn
+      Events:
+        Analyze:
+          Type: Api
+          Properties:
+            Path: /analyze
+            Method: post
+  TrackFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: adhikar-track
+      CodeUri: src/track/
+      Handler: handler.lambda_handler
+      Description: Status tracking and updates
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:Query
+              Resource: !GetAtt CasesTable.Arn
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref NotificationTopic
+      Events:
+        GetStatus:
+          Type: Api
+          Properties:
+            Path: /status/{caseId}
+            Method: get
+        UpdateStatus:
+          Type: Api
+          Properties:
+            Path: /status/{caseId}
+            Method: put
+
+  # Step Functions
+  StepFunctionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: adhikar-stepfunctions-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambdas
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !GetAtt ExtractFunction.Arn
+                  - !GetAtt MatchFunction.Arn
+                  - !GetAtt GenerateFunction.Arn
+                  - !GetAtt TrackFunction.Arn
+
+  AdhikarWorkflow:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: adhikar-workflow
+      DefinitionUri: statemachine/workflow.asl.json
+      DefinitionSubstitutions:
+        ExtractFunctionArn: !GetAtt ExtractFunction.Arn
+        MatchFunctionArn: !GetAtt MatchFunction.Arn
+        GenerateFunctionArn: !GetAtt GenerateFunction.Arn
+        TrackFunctionArn: !GetAtt TrackFunction.Arn
+      Role: !GetAtt StepFunctionsRole.Arn
+
+  # EventBridge
+  ReminderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: adhikar-eventbridge-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PublishSNS
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref NotificationTopic
+
+  WeeklyReminderRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: adhikar-weekly-reminder
+      Description: Remind users about pending cases every week
+      ScheduleExpression: "rate(7 days)"
+      State: ENABLED
+      Targets:
+        - Arn: !Ref NotificationTopic
+          Id: adhikar-sns-reminder
+          RoleArn: !GetAtt ReminderRole.Arn
+
+Outputs:
+  AnalyzeUrl:
+    Description: Start analysis
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/analyze"
+  HealthUrl:
+    Description: Health check URL
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/health"
+  PresignUrl:
+    Description: Presigned URL endpoint
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/presign"
+  ExtractUrl:
+    Description: Extract endpoint
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/extract"
+  StatusUrl:
+    Description: Status endpoint
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/status/{caseId}"
+  BucketName:
+    Description: S3 bucket for documents
+    Value: !Ref DocumentsBucket
+  StateMachineArn:
+    Description: Step Functions ARN
+    Value: !Ref AdhikarWorkflow
+
+

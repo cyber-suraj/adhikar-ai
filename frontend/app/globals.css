@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+:root {
+  --color-primary: #E07A00;
+  --color-success: #1A7F37;
+  --color-error: #B91C1C;
+  --color-bg: #FAFAF7;
+  --color-surface: #FFFFFF;
+  --color-text: #1A1A1A;
+  --color-muted: #52525B;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: "Noto Sans", sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    background-color: var(--color-primary);
+    color: white;
+    font-size: 18px;
+    font-weight: 600;
+    min-height: 56px;
+    width: 100%;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.2s;
+  }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .card {
+    background: var(--color-surface);
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    padding: 24px;
+  }
+
+  .status-pill {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .status-Uploaded    { background: #E0F2FE; color: #0369A1; }
+  .status-Extracted   { background: #F3E8FF; color: #7E22CE; }
+  .status-Matched     { background: #FEF9C3; color: #854D0E; }
+  .status-Diagnosed   { background: #DCFCE7; color: #166534; }
+  .status-Filed       { background: #DBEAFE; color: #1D4ED8; }
+  .status-InReview    { background: #FEF3C7; color: #92400E; }
+  .status-Resolved    { background: #D1FAE5; color: #065F46; }
+}
