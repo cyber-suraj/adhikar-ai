@@ -89,7 +89,8 @@ def detect_mismatches(doc_a: dict, doc_b: dict, source_a: str, source_b: str) ->
         val_a = doc_a.get(field, "")
         val_b = doc_b.get(field, "")
         score = compare_field(val_a, val_b)
-        if score < MATCH_THRESHOLD:
+        # Any non-exact match is a discrepancy in government databases
+        if val_a.strip().lower() != val_b.strip().lower():
             correction = CORRECTION_OFFICES.get(field, {
                 "office": "Concerned Government Office",
                 "process": "Contact the issuing authority",

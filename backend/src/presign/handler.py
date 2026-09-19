@@ -34,11 +34,12 @@ def lambda_handler(event, context):
         file_type = body.get("fileType", "image/jpeg")
         doc_type = body.get("docType", "rejection_letter")  # rejection_letter | aadhaar | land_record | bank_passbook
 
-        case_id = str(uuid.uuid4())
+        case_id = body.get("caseId") or str(uuid.uuid4())
         # Determine extension
         ext_map = {
             "image/jpeg": "jpg", "image/jpg": "jpg",
-            "image/png": "png", "application/pdf": "pdf"
+            "image/png": "png", "application/pdf": "pdf",
+            "text/plain": "txt"
         }
         ext = ext_map.get(file_type, "jpg")
         key = f"cases/{case_id}/{doc_type}.{ext}"

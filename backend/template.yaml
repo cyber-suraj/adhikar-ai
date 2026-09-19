@@ -12,7 +12,6 @@ Globals:
         LOG_LEVEL: INFO
         BUCKET_NAME: !Ref DocumentsBucket
         TABLE_NAME: !Ref CasesTable
-        STATE_MACHINE_ARN: !Ref AdhikarWorkflow
         SNS_TOPIC_ARN: !Ref NotificationTopic
   Api:
     Cors:
@@ -198,31 +197,6 @@ Resources:
             Path: /status/{caseId}
             Method: put
 
-  AnalyzeFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: adhikar-analyze
-      CodeUri: src/analyze/
-      Handler: handler.lambda_handler
-      Description: Start Step Functions analysis workflow
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - Statement:
-            - Effect: Allow
-              Action:
-                - states:StartExecution
-              Resource: !Ref AdhikarWorkflow
-            - Effect: Allow
-              Action:
-                - dynamodb:PutItem
-              Resource: !GetAtt CasesTable.Arn
-      Events:
-        Analyze:
-          Type: Api
-          Properties:
-            Path: /analyze
-            Method: post
-
   StepFunctionsRole:
     Type: AWS::IAM::Role
     Properties:
@@ -258,6 +232,34 @@ Resources:
         GenerateFunctionArn: !GetAtt GenerateFunction.Arn
         TrackFunctionArn: !GetAtt TrackFunction.Arn
       Role: !GetAtt StepFunctionsRole.Arn
+
+  AnalyzeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: adhikar-analyze
+      CodeUri: src/analyze/
+      Handler: handler.lambda_handler
+      Description: Start Step Functions analysis workflow
+      Environment:
+        Variables:
+          STATE_MACHINE_ARN: !Ref AdhikarWorkflow
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - states:StartExecution
+              Resource: !Ref AdhikarWorkflow
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt CasesTable.Arn
+      Events:
+        Analyze:
+          Type: Api
+          Properties:
+            Path: /analyze
+            Method: post
 
   ReminderRole:
     Type: AWS::IAM::Role
@@ -301,9 +303,6 @@ Outputs:
   PresignUrl:
     Description: Presigned URL endpoint
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/presign"
-  ExtractUrl:
-    Description: Extract endpoint
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/extract"
   StatusUrl:
     Description: Status endpoint
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/status/{caseId}"

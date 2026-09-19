@@ -138,7 +138,7 @@ export default function Home() {
 
       {/* Upload card */}
       <div className="card" style={{ marginBottom: "16px" }}>
-        <input ref={inputRef} type="file" accept="image/*,application/pdf"
+        <input ref={inputRef} type="file" accept="image/*,application/pdf,text/plain,.txt"
           style={{ display: "none" }} onChange={handleFile} capture="environment" />
         {!file ? (
           <button onClick={() => inputRef.current?.click()} style={{
@@ -148,7 +148,7 @@ export default function Home() {
           }}>
             <span style={{ fontSize: "48px" }}>📷</span>
             <span style={{ color: "#E07A00", fontWeight: 600, fontSize: "17px" }}>{L.upload}</span>
-            <span style={{ color: "#52525B", fontSize: "13px" }}>JPG, PNG, or PDF</span>
+            <span style={{ color: "#52525B", fontSize: "13px" }}>JPG, PNG, PDF, or TXT</span>
           </button>
         ) : (
           <div style={{ textAlign: "center" }}>
@@ -179,6 +179,33 @@ export default function Home() {
           : status === "analyzing" ? L.analyzing
           : `${L.submit} →`}
       </button>
+
+      <div style={{ textAlign: "center", margin: "16px 0" }}>
+        <button
+          onClick={async () => {
+            setStatus("analyzing");
+            setErrorMsg("");
+            try {
+              const demoCaseId = `demo-${Date.now()}`;
+              await startAnalysis(demoCaseId, "cases/demo-001/rejection_letter.txt", lang, "PM-KISAN", "Suraj Khanase");
+              router.push(`/status/${demoCaseId}?lang=${lang}`);
+            } catch (err: unknown) {
+              setStatus("error");
+              setErrorMsg(err instanceof Error ? err.message : "Demo failed to start.");
+            }
+          }}
+          disabled={status === "uploading" || status === "analyzing"}
+          style={{
+            background: "none", border: "2px solid #E07A00", color: "#E07A00",
+            borderRadius: "8px", padding: "10px 20px", fontWeight: 600,
+            fontSize: "14px", cursor: "pointer", width: "100%",
+          }}
+        >
+          {lang === "hi" ? "⚡ लाइव डेमो देखें (PM-KISAN अस्वीकृति)"
+            : lang === "mr" ? "⚡ लाइव डेमो पहा (PM-KISAN नकार)"
+            : "⚡ Try Live Demo (PM-KISAN Rejection)"}
+        </button>
+      </div>
 
       {/* How it works */}
       <div style={{ marginTop: "40px" }}>

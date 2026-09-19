@@ -164,6 +164,8 @@ def lambda_handler(event, context):
     # Accept mismatches from Step Functions pass-through
     match_result = event.get("matchResult", {})
     mismatches = match_result.get("mismatches", event.get("mismatches", []))
+    if (not applicant_name or applicant_name in ("Applicant", "Unknown")) and match_result.get("aadhaarName"):
+        applicant_name = match_result["aadhaarName"]
 
     print(f"[generate] caseId={case_id} lang={lang} mismatches={len(mismatches)} fallback={use_fallback}")
 
