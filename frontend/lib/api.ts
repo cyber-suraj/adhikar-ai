@@ -19,11 +19,15 @@ export async function uploadToS3(uploadUrl: string, file: File) {
   if (!res.ok) throw new Error("Upload to S3 failed");
 }
 
-export async function startAnalysis(caseId: string, s3Key: string, lang = "en", scheme = "PM-KISAN", applicantName = "Suraj Khanase") {
+export async function startAnalysis(caseId: string, s3Key: string, lang = "en", scheme?: string, applicantName?: string) {
+  const payload: Record<string, string> = { caseId, s3Key, lang };
+  if (scheme) payload.scheme = scheme;
+  if (applicantName) payload.applicantName = applicantName;
+
   const res = await fetch(`${API}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ caseId, s3Key, lang, scheme, applicantName }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error("Analysis failed to start");
   return res.json();
