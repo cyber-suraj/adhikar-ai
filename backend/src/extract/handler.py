@@ -104,19 +104,19 @@ def find_pattern(text: str, patterns: list) -> str:
 
 def extract_applicant_name(lines: list, full_text: str) -> str:
     """Extract applicant or recipient name from document lines or text."""
-    # 1. Regex pattern on full text for explicit Applicant/Name labels
+    # 1. Regex pattern stopping strictly at end of line
     m = re.search(
-        r"(?:applicant(?:\s+name)?|name|naam|citizen(?:\s+name)?)\s*[:\-]\s*([A-Za-z]+(?:\s+[A-Za-z]+){1,3})",
+        r"(?im)^\s*(?:applicant\s*name|applicant|citizen\s*name|citizen|name|naam)\s*[:\-]\s*([^\n\r]+)",
         full_text,
-        re.IGNORECASE,
     )
     if m:
         candidate = m.group(1).strip()
-        if not re.search(r"^(?:pune|maharashtra|kharif|rabi|village|taluka|district|helpdesk|office)$", candidate, re.I):
+        candidate = re.sub(r"\s*\(.*?\)", "", candidate).strip()
+        if candidate and not re.search(r"^(?:pune|maharashtra|kharif|rabi|village|taluka|district|helpdesk|office)$", candidate, re.I):
             return candidate
 
     # 2. 'To,' pattern (rejection letters)
-    m = re.search(r"to\s*,\s*\n\s*([A-Za-z]+(?:\s+[A-Za-z]+){1,3})", full_text, re.IGNORECASE)
+    m = re.search(r"(?im)^\s*to\s*,\s*\n\s*([A-Za-z]+(?:\s+[A-Za-z]+){1,3})", full_text)
     if m:
         return m.group(1).strip()
 
@@ -143,12 +143,14 @@ def extract_applicant_name(lines: list, full_text: str) -> str:
 
 def extract_father_name(lines: list, full_text: str, applicant_name: str) -> str:
     m = re.search(
-        r"(?:father(?:'s)?(?:\s+name)?|s/o|d/o|w/o|shri|pita(?:\s+ka\s+naam)?)\s*[:\-]\s*([A-Za-z]+(?:\s+[A-Za-z]+){1,3})",
+        r"(?im)^\s*(?:father(?:'s)?\s*name|father|s/o|d/o|w/o|shri|pita(?:\s*ka\s*naam)?)\s*[:\-]\s*([^\n\r]+)",
         full_text,
-        re.IGNORECASE,
     )
     if m:
-        return m.group(1).strip()
+        candidate = m.group(1).strip()
+        candidate = re.sub(r"\s*\(.*?\)", "", candidate).strip()
+        if candidate:
+            return candidate
 
     # If applicant name has 3 words (First Middle Last), the middle name is often the father's name
     if applicant_name and applicant_name != "Unknown":
@@ -159,12 +161,22 @@ def extract_father_name(lines: list, full_text: str, applicant_name: str) -> str
 
 
 def extract_dob(full_text: str) -> str:
-    m = re.search(r"(?:dob|date\s*of\s*birth|janm\s*tithi)\s*[:\-]\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})", full_text, re.IGNORECASE)
-    return m.group(1).strip() if m else "Unknown"
+    m = re.search(
+        r"(?im)^\s*(?:date\s*of\s*birth|dob|janm\s*tithi)\s*[:\-]\s*([^\n\r]+)",
+        full_text,
+    )
+    if m:
+        candidate = m.group(1).strip()
+        dm = re.search(r"(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})", candidate)
+        return dm.group(1) if dm else candidate
+    return "Unknown"
 
 
 def extract_address(full_text: str) -> str:
-    m = re.search(r"(?:village|taluka|district|address|dist)\s*[:\-]\s*([^\n\r]+)", full_text, re.IGNORECASE)
+    m = re.search(
+        r"(?im)^\s*(?:address|village|taluka|district|dist)\s*[:\-]\s*([^\n\r]+)",
+        full_text,
+    )
     return m.group(1).strip() if m else "Unknown"
 
 

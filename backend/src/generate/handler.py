@@ -111,7 +111,7 @@ Keep under 150 words."""
 def call_bedrock(prompt: str) -> str:
     payload = {
         "messages": [{"role": "user", "content": [{"text": prompt}]}],
-        "inferenceConfig": {"maxTokens": 512, "temperature": 0.3},
+        "inferenceConfig": {"maxTokens": 400, "temperature": 0.3},
     }
     response = bedrock.invoke_model(
         modelId=MODEL_ID,
@@ -199,10 +199,12 @@ def lambda_handler(event, context):
             diagnosis_hi = call_bedrock(build_prompt(mismatches, scheme, applicant_name, "hi"))
             diagnosis_mr = call_bedrock(build_prompt(mismatches, scheme, applicant_name, "mr"))
         except ClientError as e:
-            print(f"[generate] Bedrock error: {e}. Using fallback.")
+            print(f"BEDROCK ERROR: {type(e).__name__}: {e}")
+            import traceback; traceback.print_exc()
             use_fallback = True
         except Exception as e:
-            print(f"[generate] Unexpected error: {e}. Using fallback.")
+            print(f"BEDROCK ERROR: {type(e).__name__}: {e}")
+            import traceback; traceback.print_exc()
             use_fallback = True
 
     if use_fallback:

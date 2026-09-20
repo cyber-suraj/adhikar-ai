@@ -156,7 +156,10 @@ Resources:
             - Effect: Allow
               Action:
                 - bedrock:InvokeModel
-              Resource: "*"
+                - bedrock:InvokeModelWithResponseStream
+              Resource:
+                - "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0"
+                - "*"
             - Effect: Allow
               Action:
                 - dynamodb:PutItem
