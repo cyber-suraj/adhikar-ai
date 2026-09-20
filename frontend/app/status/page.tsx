@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { getCaseStatus, updateCaseStatus } from "@/lib/api";
 
 type Lang = "en" | "hi" | "mr";
@@ -44,12 +44,9 @@ const STATUS_LABELS: Record<Lang, Record<string,string>> = {
   mr: { Uploaded:"अपलोड",Extracted:"वाचले",Matched:"जुळले",Diagnosed:"निदान",Filed:"दाखल",InReview:"तपासणी",Resolved:"निराकरण" },
 };
 
-export default function StatusClient() {
-  const params = useParams();
-  const rawParam = params?.caseId as string | undefined;
-  const pathId = typeof window !== "undefined" ? window.location.pathname.split("/")[2] : "";
-  const caseId = rawParam || pathId || "demo";
+function StatusContent() {
   const searchParams = useSearchParams();
+  const caseId = searchParams.get("id");
   const langParam = (searchParams.get("lang") || "en") as Lang;
   const [lang, setLang] = useState<Lang>(langParam);
   const [data, setData] = useState<CaseData | null>(null);
@@ -59,6 +56,7 @@ export default function StatusClient() {
   const [polling, setPolling] = useState(false);
 
   const fetchStatus = useCallback(async () => {
+    if (!caseId) return;
     try {
       setPolling(true);
       const d = await getCaseStatus(caseId);
@@ -73,14 +71,19 @@ export default function StatusClient() {
   }, [caseId]);
 
   useEffect(() => {
+    if (!caseId) {
+      setLoading(false);
+      return;
+    }
     fetchStatus();
     const interval = setInterval(() => {
       fetchStatus();
     }, 5000);
     return () => clearInterval(interval);
-  }, [fetchStatus]);
+  }, [fetchStatus, caseId]);
 
   async function handleStatusUpdate(newStatus: string) {
+    if (!caseId) return;
     await updateCaseStatus(caseId, newStatus);
     await fetchStatus();
   }
@@ -105,6 +108,16 @@ export default function StatusClient() {
     const msgs: Record<Lang, string> = { en: data.statusMessageEn, hi: data.statusMessageHi, mr: data.statusMessageMr };
     return msgs[lang];
   };
+
+  if (!caseId) {
+    return (
+      <div className="card" style={{ textAlign: "center", padding: "40px 20px" }}>
+        <p style={{ fontSize: "16px", fontWeight: 600, color: "#52525B" }}>
+          No case ID provided. Please upload a document first.
+        </p>
+      </div>
+    );
+  }
 
   if (loading) return <div style={{textAlign:"center",padding:"60px 0",color:"#52525B"}}>Loading your case...</div>;
   if (error) return <div style={{color:"#B91C1C",padding:"20px"}}>Error: {error}</div>;
@@ -231,5 +244,13 @@ export default function StatusClient() {
         <p style={{textAlign:"center",color:"#52525B",fontSize:"14px",marginTop:"16px"}}>Checking for updates every 5 seconds...</p>
       )}
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div style={{ textAlign: "center", padding: "60px 0", color: "#52525B" }}>Loading your case...</div>}>
+      <StatusContent />
+    </Suspense>
   );
 }

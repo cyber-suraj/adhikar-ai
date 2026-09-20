@@ -92,7 +92,7 @@ export default function Home() {
       await uploadToS3(uploadUrl, file);
       setStatus("analyzing");
       await startAnalysis(caseId, key, lang);
-      router.push(`/status/${caseId}?lang=${lang}`);
+      router.push(`/status?id=${caseId}&lang=${lang}`);
     } catch (err: unknown) {
       setStatus("error");
       setErrorMsg(err instanceof Error ? err.message : "Something went wrong. Please try again.");
@@ -188,7 +188,7 @@ export default function Home() {
             try {
               const demoCaseId = `demo-${Date.now()}`;
               await startAnalysis(demoCaseId, "cases/demo-001/rejection_letter.txt", lang, "PM-KISAN", "Suraj Khanase");
-              router.push(`/status/${demoCaseId}?lang=${lang}`);
+              router.push(`/status?id=${demoCaseId}&lang=${lang}`);
             } catch (err: unknown) {
               setStatus("error");
               setErrorMsg(err instanceof Error ? err.message : "Demo failed to start.");
