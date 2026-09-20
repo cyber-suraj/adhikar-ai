@@ -26,19 +26,19 @@ LANG_NAMES = {
 FALLBACK_DIAGNOSIS = {
     "en": (
         "Your application was rejected because of a data mismatch. "
-        "The name on your {sourceA} ({valueA}) does not match the name on your {sourceB} ({valueB}). "
+        "The {fieldLabel} on your {sourceA} ({valueA}) does not match the details on your {sourceB} ({valueB}). "
         "You need to visit the {correctionOffice} to correct this. "
         "The process: {correctionProcess}. Expected time: {estimatedTimeline}."
     ),
     "hi": (
         "आपका आवेदन डेटा मेल न खाने के कारण अस्वीकार किया गया। "
-        "आपके {sourceA} पर नाम ({valueA}) आपके {sourceB} पर नाम ({valueB}) से मेल नहीं खाता। "
+        "आपके {sourceA} पर {fieldLabel} ({valueA}) आपके {sourceB} पर विवरण ({valueB}) से मेल नहीं खाता। "
         "कृपया {correctionOffice} जाएं। "
         "प्रक्रिया: {correctionProcess}। अनुमानित समय: {estimatedTimeline}।"
     ),
     "mr": (
         "तुमचा अर्ज डेटा जुळत नसल्यामुळे नाकारला गेला. "
-        "तुमच्या {sourceA} वरील नाव ({valueA}) तुमच्या {sourceB} वरील नाव ({valueB}) शी जुळत नाही. "
+        "तुमच्या {sourceA} वरील {fieldLabel} ({valueA}) तुमच्या {sourceB} वरील माहिती ({valueB}) शी जुळत नाही. "
         "कृपया {correctionOffice} ला भेट द्या. "
         "प्रक्रिया: {correctionProcess}. अपेक्षित वेळ: {estimatedTimeline}."
     ),
@@ -53,23 +53,23 @@ The {officeName}
 
 Date: {date}
 
-Subject: Request for correction of {fieldLabel} in government records
+Subject: Request for correction of {fieldLabel} in official records
 
 Respected Sir/Madam,
 
-I, {applicantName}, am writing to request a correction in my official records
+I, {applicantName}, am writing to request an official correction in my records
 in connection with my application for {scheme}.
 
 MISMATCH DETAILS:
   Field           : {fieldLabel}
   Value in {sourceA} : {valueA}
   Value in {sourceB} : {valueB}
-  Required Action : Update {sourceB} to match {sourceA}
+  Required Action : Update records to reflect {valueA}
 
 I hereby submit the following supporting documents:
   1. Original {sourceA}
   2. Copy of {sourceB}
-  3. Copy of rejection letter
+  3. Copy of rejection letter / verification notice
 
 I request you to kindly correct the above mismatch at the earliest.
 
@@ -83,21 +83,24 @@ Receipt No: ___________  Date: ___________  Officer: ___________
 """
 
 
-def build_prompt(mismatches: list, scheme: str, lang: str) -> str:
+def build_prompt(mismatches: list, scheme: str, applicant_name: str, lang: str) -> str:
     lang_name = LANG_NAMES.get(lang, "English")
     mismatch_text = "\n".join([
         f"- Field: {m['fieldLabel']}, In {m['sourceA']}: '{m['valueA']}', In {m['sourceB']}: '{m['valueB']}' (similarity: {m['similarityScore']}%)"
         for m in mismatches
     ])
+    office = mismatches[0].get("correctionOffice", "Government Office") if mismatches else "Government Office"
     return f"""You are a helpful government assistance AI for India.
 
-A citizen has been rejected from {scheme}. The following data mismatches were found:
+Citizen Name: {applicant_name}
+Scheme: {scheme}
 
+The following data mismatches were found:
 {mismatch_text}
 
-Please write a SHORT plain-language explanation in {lang_name} that:
-1. Tells the citizen exactly what is wrong (field name, the two different values)
-2. Tells them which office to go to: {mismatches[0].get('correctionOffice', 'Government Office') if mismatches else 'Government Office'}
+Please write a SHORT plain-language explanation in {lang_name} for {applicant_name} that:
+1. Tells them exactly what is wrong (field name, the two different values)
+2. Tells them which office to go to: {office}
 3. Tells them what documents to bring
 4. Tells them how many days it will take
 
@@ -124,8 +127,9 @@ def build_fallback_diagnosis(mismatches: list, lang: str) -> str:
     if not mismatches:
         template = FALLBACK_DIAGNOSIS.get(lang, FALLBACK_DIAGNOSIS["en"])
         return template.format(
-            sourceA="document A", valueA="value A",
-            sourceB="document B", valueB="value B",
+            fieldLabel="details",
+            sourceA="submitted document", valueA="value A",
+            sourceB="government record", valueB="value B",
             correctionOffice="concerned government office",
             correctionProcess="contact issuing authority",
             estimatedTimeline="7-14 working days",
@@ -158,16 +162,31 @@ def lambda_handler(event, context):
     case_id = event.get("caseId")
     use_fallback = event.get("useFallback", False)
     lang = event.get("lang", "en")
-    scheme = event.get("scheme", "PM-KISAN")
-    applicant_name = event.get("applicantName", "Applicant")
 
-    # Accept mismatches from Step Functions pass-through
+    # Resolve real extracted and matched values
     match_result = event.get("matchResult", {})
+    extract_result = event.get("extractResult", {})
     mismatches = match_result.get("mismatches", event.get("mismatches", []))
-    if (not applicant_name or applicant_name in ("Applicant", "Unknown")) and match_result.get("aadhaarName"):
-        applicant_name = match_result["aadhaarName"]
 
-    print(f"[generate] caseId={case_id} lang={lang} mismatches={len(mismatches)} fallback={use_fallback}")
+    applicant_name = (
+        match_result.get("applicantName")
+        or extract_result.get("applicantName")
+        or event.get("applicantName")
+    )
+    if not applicant_name or applicant_name in ("Applicant", "Unknown"):
+        if mismatches:
+            applicant_name = mismatches[0].get("valueA", "Citizen")
+        else:
+            applicant_name = "Citizen"
+
+    scheme = (
+        match_result.get("scheme")
+        or extract_result.get("scheme")
+        or event.get("scheme")
+        or "Government Welfare Scheme"
+    )
+
+    print(f"[generate] caseId={case_id} applicant={applicant_name} scheme={scheme} lang={lang} mismatches={len(mismatches)}")
 
     # ── Generate diagnosis ─────────────────────────────────────────
     diagnosis_en = ""
@@ -176,9 +195,9 @@ def lambda_handler(event, context):
 
     if not use_fallback:
         try:
-            diagnosis_en = call_bedrock(build_prompt(mismatches, scheme, "en"))
-            diagnosis_hi = call_bedrock(build_prompt(mismatches, scheme, "hi"))
-            diagnosis_mr = call_bedrock(build_prompt(mismatches, scheme, "mr"))
+            diagnosis_en = call_bedrock(build_prompt(mismatches, scheme, applicant_name, "en"))
+            diagnosis_hi = call_bedrock(build_prompt(mismatches, scheme, applicant_name, "hi"))
+            diagnosis_mr = call_bedrock(build_prompt(mismatches, scheme, applicant_name, "mr"))
         except ClientError as e:
             print(f"[generate] Bedrock error: {e}. Using fallback.")
             use_fallback = True
@@ -196,6 +215,8 @@ def lambda_handler(event, context):
 
     result = {
         "caseId": case_id,
+        "applicantName": applicant_name,
+        "scheme": scheme,
         "diagnosisEn": diagnosis_en,
         "diagnosisHi": diagnosis_hi,
         "diagnosisMr": diagnosis_mr,
@@ -204,21 +225,23 @@ def lambda_handler(event, context):
         "status": "Diagnosed",
     }
 
-    # ── Store in DynamoDB ──────────────────────────────────────────
+    # Store in DynamoDB
     if case_id:
         table.update_item(
             Key={"caseId": case_id},
-            UpdateExpression="SET diagnosisEn = :e, diagnosisHi = :h, diagnosisMr = :m, correctionForm = :f, #s = :st, usedFallback = :fb",
+            UpdateExpression="SET diagnosisEn = :e, diagnosisHi = :h, diagnosisMr = :m, correctionForm = :f, applicantName = :a, scheme = :sc, #s = :st, usedFallback = :fb",
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={
                 ":e": diagnosis_en,
                 ":h": diagnosis_hi,
                 ":m": diagnosis_mr,
                 ":f": correction_form,
+                ":a": applicant_name,
+                ":sc": scheme,
                 ":st": "Diagnosed",
                 ":fb": use_fallback,
             },
         )
 
-    print(f"[generate] done. fallback={use_fallback}")
+    print(f"[generate] done for {applicant_name}. fallback={use_fallback}")
     return result

@@ -1,6 +1,6 @@
 """
 Analyze Lambda - HTTP entry point that starts the Step Functions workflow
-POST /analyze  { caseId, s3Key, lang?, scheme? }
+POST /analyze  { caseId, s3Key, lang? }
      -> starts execution, returns { executionArn, caseId }
 """
 import json
@@ -37,31 +37,37 @@ def lambda_handler(event, context):
         case_id = body.get("caseId") or str(uuid.uuid4())
         s3_key = body.get("s3Key") or body.get("key")
         lang = body.get("lang", "en")
-        scheme = body.get("scheme", "PM-KISAN")
-        applicant_name = body.get("applicantName", "Applicant")
 
         if not s3_key:
             return cors_response(400, {"error": "s3Key is required"})
 
-        # Create initial DynamoDB record
-        table.put_item(Item={
+        # Initial DynamoDB record - do not inject hardcoded demo applicant
+        initial_item = {
             "caseId": case_id,
             "s3Key": s3_key,
             "lang": lang,
-            "scheme": scheme,
-            "applicantName": applicant_name,
             "status": "Uploaded",
             "createdAt": datetime.now(timezone.utc).isoformat(),
-        })
+        }
+        # Only preserve scheme/applicantName if explicitly provided and not default demo
+        if body.get("scheme") and body["scheme"] not in ("PM-KISAN", "default"):
+            initial_item["scheme"] = body["scheme"]
+        if body.get("applicantName") and body["applicantName"] not in ("Suraj Khanase", "Applicant", "default"):
+            initial_item["applicantName"] = body["applicantName"]
 
-        # Start Step Functions execution
+        table.put_item(Item=initial_item)
+
+        # Start Step Functions execution without injecting hardcoded values
         execution_input = {
             "caseId": case_id,
             "s3Key": s3_key,
             "lang": lang,
-            "scheme": scheme,
-            "applicantName": applicant_name,
         }
+        if "scheme" in initial_item:
+            execution_input["scheme"] = initial_item["scheme"]
+        if "applicantName" in initial_item:
+            execution_input["applicantName"] = initial_item["applicantName"]
+
         execution = sfn.start_execution(
             stateMachineArn=STATE_MACHINE_ARN,
             name=f"adhikar-{case_id[:8]}-{int(datetime.now().timestamp())}",

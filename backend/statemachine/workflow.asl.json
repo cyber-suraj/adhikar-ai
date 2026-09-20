@@ -82,7 +82,8 @@
       "Parameters": {
         "caseId.$": "$.caseId",
         "useFallback": true,
-        "matchResult.$": "$.matchResult"
+        "matchResult.$": "$.matchResult",
+        "extractResult.$": "$.extractResult"
       },
       "ResultPath": "$.generateResult",
       "Next": "UpdateStatus"
