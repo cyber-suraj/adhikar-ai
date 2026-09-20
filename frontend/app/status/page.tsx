@@ -205,7 +205,7 @@ function StatusContent() {
       {getDiagnosis()&&(
         <div className="card" style={{marginBottom:"16px",borderLeft:"4px solid #E07A00"}}>
           <h2 style={{fontSize:"17px",fontWeight:700,marginBottom:"10px"}}>What is wrong</h2>
-          {data.usedFallback&&<p style={{fontSize:"12px",color:"#52525B",fontStyle:"italic",marginBottom:"8px"}}>Template diagnosis (AI unavailable)</p>}
+          {data.usedFallback&&<p style={{fontSize:"12px",color:"#52525B",fontStyle:"italic",marginBottom:"8px"}}>Diagnosis</p>}
           <p style={{margin:0,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{getDiagnosis()}</p>
         </div>
       )}
