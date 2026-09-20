@@ -128,22 +128,25 @@ def lambda_handler(event, context):
 
     ref_docs = event.get("referenceDocs") or {}
 
-    # Check if this is the demo PM-KISAN letter
-    if applicant_name == "Suraj Khanase" or ("demo" in str(case_id).lower() and applicant_name in ("Suraj Khanase", "Unknown")):
+    # Only use demo reference documents if case_id explicitly contains "demo"
+    is_demo = "demo" in str(case_id).lower()
+    if is_demo:
+        print(f"[match] Demo case ({case_id}) detected, using demo documents")
         doc_a = DEMO_DOCUMENTS["aadhaar"]
         doc_b = DEMO_DOCUMENTS["land_record"]
         source_a = "Aadhaar"
         source_b = "Land Record (7/12)"
+        applicant_name = DEMO_DOCUMENTS["aadhaar"]["name"]
     else:
         # Real applicant extracted from uploaded document
         doc_a = {
-            "name": applicant_name,
+            "name": applicant_name if applicant_name else "Applicant",
         }
-        if father_name != "Unknown":
+        if father_name and father_name != "Unknown":
             doc_a["fatherName"] = father_name
-        if dob != "Unknown":
+        if dob and dob != "Unknown":
             doc_a["dob"] = dob
-        if address != "Unknown":
+        if address and address != "Unknown":
             doc_a["address"] = address
 
         source_a = "Submitted Document / Aadhaar"
@@ -160,8 +163,9 @@ def lambda_handler(event, context):
             doc_b = dict(doc_a)
 
             # Realistic discrepancy based on document reason
+            curr_name = applicant_name or "Applicant"
             if "Name" in reason or "Details" in reason or reason == "Unknown":
-                parts = applicant_name.split()
+                parts = curr_name.split()
                 if len(parts) >= 3:
                     # Drop middle name
                     doc_b["name"] = f"{parts[0]} {parts[-1]}"
@@ -169,16 +173,16 @@ def lambda_handler(event, context):
                     # Spelling typo
                     doc_b["name"] = f"{parts[0][:-1]} {parts[1]}" if len(parts[0]) > 3 else f"{parts[0]} {parts[1][:-1]}"
                 else:
-                    doc_b["name"] = f"{applicant_name} (Applicant)"
+                    doc_b["name"] = f"{curr_name} (Applicant)"
 
-            if "Father" in reason and father_name != "Unknown":
+            if "Father" in reason and father_name and father_name != "Unknown":
                 parts = father_name.split()
                 doc_b["fatherName"] = f"{parts[0]} {parts[-1][:-1]}" if len(parts) >= 2 else f"{father_name}ji"
 
-            if "DOB" in reason and dob != "Unknown":
+            if "DOB" in reason and dob and dob != "Unknown":
                 doc_b["dob"] = f"{dob[:6]}1995" if len(dob) >= 8 else "01/01/1995"
 
-            if "Address" in reason and address != "Unknown":
+            if "Address" in reason and address and address != "Unknown":
                 doc_b["address"] = f"{address.split(',')[0]}, Maharashtra"
 
     # Compare Document A and Document B with fuzzywuzzy

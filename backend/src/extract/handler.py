@@ -184,19 +184,26 @@ def lambda_handler(event, context):
     print(f"[extract] caseId={case_id} bucket={s3_bucket} key={s3_key}")
 
     used_fallback = False
+    textract_failed = False
     raw_text = ""
     lines = []
 
-    try:
-        raw_text = extract_text_from_s3(s3_bucket, s3_key)
-        lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
-    except Exception as e:
-        print(f"[WARNING] Textract extraction failed, falling back to demo data: {e}")
-        used_fallback = True
+    is_demo = "demo" in str(case_id).lower()
 
-    if not raw_text or used_fallback:
-        print("[WARNING] No text extracted or Textract error, using fallback demo record")
-        used_fallback = True
+    if not is_demo:
+        try:
+            raw_text = extract_text_from_s3(s3_bucket, s3_key)
+            lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
+            if not raw_text:
+                print(f"[WARNING] No text returned from Textract for s3://{s3_bucket}/{s3_key}")
+                textract_failed = True
+        except Exception as e:
+            print(f"[WARNING] Textract extraction failed with exception: {e}")
+            textract_failed = True
+            used_fallback = True
+
+    if is_demo:
+        print(f"[extract] Demo case detected ({case_id}), using demo reference data")
         applicant_name = DEMO_FALLBACK_DATA["applicantName"]
         father_name = DEMO_FALLBACK_DATA["fatherName"]
         dob = DEMO_FALLBACK_DATA["dob"]
@@ -205,6 +212,17 @@ def lambda_handler(event, context):
         scheme = DEMO_FALLBACK_DATA["scheme"]
         reason = DEMO_FALLBACK_DATA["rejectionReason"]
         department = DEMO_FALLBACK_DATA["department"]
+    elif textract_failed:
+        print(f"[WARNING] Textract failed for caseId={case_id}. Returning null fields with textract_failed=True")
+        used_fallback = True
+        applicant_name = None
+        father_name = None
+        dob = None
+        address = None
+        aadhaar_last4 = None
+        scheme = event.get("scheme")
+        reason = "Extraction failed"
+        department = None
     else:
         applicant_name = extract_applicant_name(lines, raw_text)
         father_name = extract_father_name(lines, raw_text, applicant_name)
@@ -228,7 +246,7 @@ def lambda_handler(event, context):
         "caseId": case_id,
         "s3Bucket": s3_bucket,
         "s3Key": s3_key,
-        "rawText": raw_text[:2000],
+        "rawText": raw_text[:2000] if raw_text else "",
         "extractedFields": {
             "name": applicant_name,
             "father_name": father_name,
@@ -246,10 +264,11 @@ def lambda_handler(event, context):
         "department": department,
         "status": "Extracted",
         "extractFallback": used_fallback,
+        "textract_failed": textract_failed,
     }
 
     # Store in DynamoDB
     table.put_item(Item=result)
-    print(f"[extract] stored: applicant={applicant_name} scheme={scheme} reason={reason} fallback={used_fallback}")
+    print(f"[extract] stored: applicant={applicant_name} scheme={scheme} reason={reason} fallback={used_fallback} textract_failed={textract_failed}")
 
     return result

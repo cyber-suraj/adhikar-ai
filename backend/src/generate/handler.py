@@ -206,6 +206,7 @@ def lambda_handler(event, context):
             use_fallback = True
 
     if use_fallback:
+        print(f"[WARNING] Bedrock unavailable or failed for caseId={case_id}. Running fallback template diagnosis.")
         diagnosis_en = build_fallback_diagnosis(mismatches, "en")
         diagnosis_hi = build_fallback_diagnosis(mismatches, "hi")
         diagnosis_mr = build_fallback_diagnosis(mismatches, "mr")

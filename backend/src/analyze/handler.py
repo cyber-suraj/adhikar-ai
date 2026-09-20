@@ -49,10 +49,9 @@ def lambda_handler(event, context):
             "status": "Uploaded",
             "createdAt": datetime.now(timezone.utc).isoformat(),
         }
-        # Only preserve scheme/applicantName if explicitly provided and not default demo
-        if body.get("scheme") and body["scheme"] not in ("PM-KISAN", "default"):
+        if body.get("scheme"):
             initial_item["scheme"] = body["scheme"]
-        if body.get("applicantName") and body["applicantName"] not in ("Suraj Khanase", "Applicant", "default"):
+        if body.get("applicantName"):
             initial_item["applicantName"] = body["applicantName"]
 
         table.put_item(Item=initial_item)
