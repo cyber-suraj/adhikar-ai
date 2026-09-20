@@ -96,8 +96,10 @@ The `samples/` folder contains simulated documents with deliberate mismatches:
 
 The name mismatch (Khanase vs Kanase) is what Adhikar AI detects and resolves.
 
-## Team
 
-- **Sumit Jagtap** — AWS deployment, architecture
-- **Nandkishor Tamkhade** — Frontend, Bedrock integration
-- **Suraj Khanase** — Textract, matching logic, demo, blog, submission
+## Team — NxtTech
+
+- **Suraj Khanase** — Leader
+- **Sumit Jagtap**
+- **Nandkishor Tamkhade**
+- **Tejas Shinde**
